@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Highly Accurate Isometric Forest Scene</title>
+    <title>Debugged Accurate Isometric Forest Scene</title>
     <style>
         body { margin: 0; overflow: hidden; background: #1a1a1a; }
         canvas { display: block; }
@@ -23,6 +23,7 @@
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         document.body.appendChild(renderer.domElement);
+        console.log("Renderer initialized");
 
         // Lighting
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
@@ -39,33 +40,55 @@
         directionalLight.shadow.mapSize.width = 2048;
         directionalLight.shadow.mapSize.height = 2048;
         scene.add(directionalLight);
-        const pointLight = new THREE.PointLight(0xffffff, 0.5, 10); // Light near pools
+        const pointLight = new THREE.PointLight(0xffffff, 0.5, 10);
         pointLight.position.set(0, 2, 0);
         scene.add(pointLight);
+        console.log("Lights added");
 
         // Terrain
         const terrainSize = 20;
         const terrainGeometry = new THREE.PlaneGeometry(terrainSize, terrainSize, 128, 128);
-        const terrainMaterial = new THREE.MeshStandardMaterial({
-            color: 0x8B4513,
-            roughness: 0.8,
-            metalness: 0.1,
-            displacementMap: new THREE.TextureLoader().load('https://threejs.org/examples/textures/terrain/displacement.jpg'),
-            displacementScale: 1.5,
-            map: new THREE.TextureLoader().load('https://threejs.org/examples/textures/terrain/grasslight-big.jpg')
-        });
-        const terrain = new THREE.Mesh(terrainGeometry, terrainMaterial);
-        terrain.rotation.x = -Math.PI / 2;
-        terrain.receiveShadow = true;
-        scene.add(terrain);
+        const terrainTextureLoader = new THREE.TextureLoader();
+        terrainTextureLoader.load(
+            'https://threejs.org/examples/textures/terrain/grasslight-big.jpg',
+            (texture) => {
+                texture.wrapS = THREE.RepeatWrapping;
+                texture.wrapT = THREE.RepeatWrapping;
+                texture.repeat.set(10, 10);
+                const terrainMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x8B4513,
+                    roughness: 0.8,
+                    metalness: 0.1,
+                    map: texture,
+                    displacementMap: terrainTextureLoader.load('https://threejs.org/examples/textures/terrain/displacement.jpg'),
+                    displacementScale: 1.5
+                });
+                const terrain = new THREE.Mesh(terrainGeometry, terrainMaterial);
+                terrain.rotation.x = -Math.PI / 2;
+                terrain.receiveShadow = true;
+                scene.add(terrain);
+                console.log("Terrain loaded");
+            },
+            undefined,
+            (error) => console.error("Terrain texture error:", error)
+        );
 
         // Environment Map for Reflections
-        new THREE.CubeTextureLoader()
-            .setPath('https://threejs.org/examples/textures/cube/pisa/')
-            .load(['px.jpg', 'nx.jpg', 'py.jpg', 'ny.jpg', 'pz.jpg', 'nz.jpg'], function (texture) {
+        const envMapLoader = new THREE.CubeTextureLoader();
+        envMapLoader.setPath('https://threejs.org/examples/textures/cube/pisa/');
+        envMapLoader.load(
+            ['px.jpg', 'nx.jpg', 'py.jpg', 'ny.jpg', 'pz.jpg', 'nz.jpg'],
+            (texture) => {
                 scene.background = texture;
-                scene.environment = texture; // Used for reflections
-            });
+                scene.environment = texture;
+                console.log("Environment map loaded");
+            },
+            undefined,
+            (error) => {
+                console.error("Environment map error:", error);
+                scene.background = new THREE.Color(0x87CEEB); // Fallback
+            }
+        );
 
         // Larger Pool (Irregular Shape)
         const largePoolShape = new THREE.Shape();
@@ -94,6 +117,7 @@
         largePool.position.set(0, 0.1, 0);
         largePool.receiveShadow = true;
         scene.add(largePool);
+        console.log("Large pool added");
 
         // Smaller Pool (Circular with Perturbation)
         const smallPoolGeometry = new THREE.CircleGeometry(0.8, 32);
@@ -118,6 +142,7 @@
         smallPool.position.set(-2, 0.1, 2);
         smallPool.receiveShadow = true;
         scene.add(smallPool);
+        console.log("Small pool added");
 
         // Trees with Multi-Layered Foliage
         function createTree(x, z, scale = 1, color = 0x228B22) {
@@ -152,17 +177,15 @@
             scene.add(treeGroup);
         }
 
-        // Tree positions based on image analysis
-        createTree(-2.5, 2.5, 0.9); // Upper-left tree
-        createTree(-1.5, 2, 1.0);  // Near small pool
-        createTree(0, 2.5, 0.95);   // Above large pool
-        createTree(2, 1.5, 1.1);    // Right of large pool
-        createTree(2.5, 0.5, 1.0);  // Orange tree
-        createTree(1, -1.5, 0.9);   // Lower-right
-        createTree(-1.5, -2, 1.0);  // Lower-left
-
-        // Orange tree
-        createTree(2.5, 0.5, 1.0, 0xFF8C00);
+        createTree(-2.5, 2.5, 0.9);
+        createTree(-1.5, 2, 1.0);
+        createTree(0, 2.5, 0.95);
+        createTree(2, 1.5, 1.1);
+        createTree(2.5, 0.5, 1.0);
+        createTree(1, -1.5, 0.9);
+        createTree(-1.5, -2, 1.0);
+        createTree(2.5, 0.5, 1.0, 0xFF8C00); // Orange tree
+        console.log("Trees added");
 
         // Rocks
         function createRock(x, z, scale = 1) {
@@ -176,10 +199,11 @@
             scene.add(rock);
         }
 
-        createRock(-1, 1, 1.0);    // Near small pool
-        createRock(1, -1, 0.8);    // Lower-right
-        createRock(2.5, -2, 1.2);  // Far-right
-        createRock(-2, -1, 0.9);   // Lower-left
+        createRock(-1, 1, 1.0);
+        createRock(1, -1, 0.8);
+        createRock(2.5, -2, 1.2);
+        createRock(-2, -1, 0.9);
+        console.log("Rocks added");
 
         // Camera and OrbitControls
         camera.position.set(8, 6, 8);
@@ -192,11 +216,12 @@
         controls.maxPolarAngle = Math.PI / 2;
         controls.target.set(0, 0, 0);
         controls.update();
+        console.log("Controls initialized");
 
         // Animation loop
         function animate() {
             requestAnimationFrame(animate);
-            largePool.material.needsUpdate = true; // Refresh reflection
+            largePool.material.needsUpdate = true;
             smallPool.material.needsUpdate = true;
             controls.update();
             renderer.render(scene, camera);
