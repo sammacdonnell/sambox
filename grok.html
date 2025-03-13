@@ -7,25 +7,49 @@
     <style>
         body { margin: 0; overflow: hidden; background: #1a1a1a; }
         canvas { display: block; }
+        #debugLog {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            z-index: 1000;
+        }
     </style>
 </head>
 <body>
+    <div id="debugLog"></div>
     <!-- Load Three.js and OrbitControls -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
     <script src="https://unpkg.com/three@0.134.0/examples/js/controls/OrbitControls.js"></script>
     <script>
+        // Debug logging function
+        function log(message) {
+            const debugLog = document.getElementById('debugLog');
+            debugLog.innerHTML += message + '<br>';
+            debugLog.scrollTop = debugLog.scrollHeight;
+            console.log(message); // Also log to console for desktop debugging
+        }
+
         // Scene setup
+        log("Initializing renderer...");
         const scene = new THREE.Scene();
-        scene.fog = new THREE.Fog(0x87CEEB, 10, 30); // Atmospheric fog
+        scene.fog = new THREE.Fog(0x87CEEB, 10, 30);
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         document.body.appendChild(renderer.domElement);
-        console.log("Renderer initialized");
+        log("Renderer initialized");
 
         // Lighting
+        log("Adding lights...");
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
         scene.add(ambientLight);
         const hemisphereLight = new THREE.HemisphereLight(0x87CEEB, 0x228B22, 0.6);
@@ -43,9 +67,10 @@
         const pointLight = new THREE.PointLight(0xffffff, 0.5, 10);
         pointLight.position.set(0, 2, 0);
         scene.add(pointLight);
-        console.log("Lights added");
+        log("Lights added");
 
         // Terrain
+        log("Loading terrain...");
         const terrainSize = 20;
         const terrainGeometry = new THREE.PlaneGeometry(terrainSize, terrainSize, 128, 128);
         const terrainTextureLoader = new THREE.TextureLoader();
@@ -60,20 +85,39 @@
                     roughness: 0.8,
                     metalness: 0.1,
                     map: texture,
-                    displacementMap: terrainTextureLoader.load('https://threejs.org/examples/textures/terrain/displacement.jpg'),
+                    displacementMap: terrainTextureLoader.load(
+                        'https://threejs.org/examples/textures/terrain/displacement.jpg',
+                        () => log("Terrain displacement map loaded"),
+                        undefined,
+                        (error) => log("Error loading displacement map: " + error.message)
+                    ),
                     displacementScale: 1.5
                 });
                 const terrain = new THREE.Mesh(terrainGeometry, terrainMaterial);
                 terrain.rotation.x = -Math.PI / 2;
                 terrain.receiveShadow = true;
                 scene.add(terrain);
-                console.log("Terrain loaded");
+                log("Terrain loaded and added");
             },
             undefined,
-            (error) => console.error("Terrain texture error:", error)
+            (error) => {
+                log("Error loading terrain texture: " + error.message);
+                // Fallback material
+                const terrainMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x8B4513,
+                    roughness: 0.8,
+                    metalness: 0.1
+                });
+                const terrain = new THREE.Mesh(terrainGeometry, terrainMaterial);
+                terrain.rotation.x = -Math.PI / 2;
+                terrain.receiveShadow = true;
+                scene.add(terrain);
+                log("Terrain added with fallback material");
+            }
         );
 
-        // Environment Map for Reflections
+        // Environment Map for Reflections (Simplified)
+        log("Loading environment map...");
         const envMapLoader = new THREE.CubeTextureLoader();
         envMapLoader.setPath('https://threejs.org/examples/textures/cube/pisa/');
         envMapLoader.load(
@@ -81,16 +125,25 @@
             (texture) => {
                 scene.background = texture;
                 scene.environment = texture;
-                console.log("Environment map loaded");
+                log("Environment map loaded");
+                // Update pool materials with envMap
+                if (largePool && smallPool) {
+                    largePool.material.envMap = texture;
+                    smallPool.material.envMap = texture;
+                    largePool.material.needsUpdate = true;
+                    smallPool.material.needsUpdate = true;
+                    log("Pool materials updated with envMap");
+                }
             },
             undefined,
             (error) => {
-                console.error("Environment map error:", error);
-                scene.background = new THREE.Color(0x87CEEB); // Fallback
+                log("Error loading environment map: " + error.message);
+                scene.background = new THREE.Color(0x87CEEB);
             }
         );
 
         // Larger Pool (Irregular Shape)
+        log("Creating large pool...");
         const largePoolShape = new THREE.Shape();
         largePoolShape.moveTo(-1.5, 0);
         largePoolShape.lineTo(-1, 1);
@@ -109,7 +162,6 @@
             metalness: 0.1,
             transparent: true,
             opacity: 0.8,
-            envMap: scene.environment,
             reflectivity: 0.8
         });
         const largePool = new THREE.Mesh(largePoolGeometry, largePoolMaterial);
@@ -117,16 +169,17 @@
         largePool.position.set(0, 0.1, 0);
         largePool.receiveShadow = true;
         scene.add(largePool);
-        console.log("Large pool added");
+        log("Large pool added");
 
         // Smaller Pool (Circular with Perturbation)
+        log("Creating small pool...");
         const smallPoolGeometry = new THREE.CircleGeometry(0.8, 32);
-        const smallPoolVertices = smallPoolGeometry.vertices;
-        for (let i = 0; i < smallPoolVertices.length; i++) {
-            smallPoolVertices[i].x += (Math.random() - 0.5) * 0.2;
-            smallPoolVertices[i].z += (Math.random() - 0.5) * 0.2;
+        const smallPoolVertices = smallPoolGeometry.attributes.position.array;
+        for (let i = 0; i < smallPoolVertices.length; i += 3) {
+            smallPoolVertices[i] += (Math.random() - 0.5) * 0.2; // x
+            smallPoolVertices[i + 2] += (Math.random() - 0.5) * 0.2; // z
         }
-        smallPoolGeometry.vertices = smallPoolVertices;
+        smallPoolGeometry.attributes.position.needsUpdate = true;
         smallPoolGeometry.computeVertexNormals();
         const smallPoolMaterial = new THREE.MeshPhysicalMaterial({
             color: 0x00CED1,
@@ -134,7 +187,6 @@
             metalness: 0.1,
             transparent: true,
             opacity: 0.8,
-            envMap: scene.environment,
             reflectivity: 0.8
         });
         const smallPool = new THREE.Mesh(smallPoolGeometry, smallPoolMaterial);
@@ -142,10 +194,11 @@
         smallPool.position.set(-2, 0.1, 2);
         smallPool.receiveShadow = true;
         scene.add(smallPool);
-        console.log("Small pool added");
+        log("Small pool added");
 
         // Trees with Multi-Layered Foliage
         function createTree(x, z, scale = 1, color = 0x228B22) {
+            log(`Creating tree at (${x}, ${z})...`);
             const treeGroup = new THREE.Group();
             const trunkGeometry = new THREE.CylinderGeometry(0.2 * scale, 0.2 * scale, 1 * scale, 12);
             const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x4A2C2A, roughness: 0.7, metalness: 0.0 });
@@ -175,6 +228,7 @@
 
             treeGroup.rotation.y = Math.random() * Math.PI * 2;
             scene.add(treeGroup);
+            log(`Tree at (${x}, ${z}) added`);
         }
 
         createTree(-2.5, 2.5, 0.9);
@@ -185,10 +239,10 @@
         createTree(1, -1.5, 0.9);
         createTree(-1.5, -2, 1.0);
         createTree(2.5, 0.5, 1.0, 0xFF8C00); // Orange tree
-        console.log("Trees added");
 
         // Rocks
         function createRock(x, z, scale = 1) {
+            log(`Creating rock at (${x}, ${z})...`);
             const rockGeometry = new THREE.DodecahedronGeometry(0.3 * scale);
             const rockMaterial = new THREE.MeshStandardMaterial({ color: 0xFFD700, roughness: 0.5, metalness: 0.2 });
             const rock = new THREE.Mesh(rockGeometry, rockMaterial);
@@ -197,15 +251,16 @@
             rock.scale.set(0.5 + Math.random() * 0.5, 0.5 + Math.random() * 0.5, 0.5 + Math.random() * 0.5);
             rock.castShadow = true;
             scene.add(rock);
+            log(`Rock at (${x}, ${z}) added`);
         }
 
         createRock(-1, 1, 1.0);
         createRock(1, -1, 0.8);
         createRock(2.5, -2, 1.2);
         createRock(-2, -1, 0.9);
-        console.log("Rocks added");
 
         // Camera and OrbitControls
+        log("Setting up camera and controls...");
         camera.position.set(8, 6, 8);
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
@@ -216,13 +271,16 @@
         controls.maxPolarAngle = Math.PI / 2;
         controls.target.set(0, 0, 0);
         controls.update();
-        console.log("Controls initialized");
+        log("Camera and controls set up");
 
         // Animation loop
+        log("Starting animation loop...");
         function animate() {
             requestAnimationFrame(animate);
-            largePool.material.needsUpdate = true;
-            smallPool.material.needsUpdate = true;
+            if (largePool && smallPool) {
+                largePool.material.needsUpdate = true;
+                smallPool.material.needsUpdate = true;
+            }
             controls.update();
             renderer.render(scene, camera);
         }
