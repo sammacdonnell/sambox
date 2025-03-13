@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Accurate Isometric Forest Scene with Direct URLs</title>
+    <title>Accurate Isometric Forest Scene with Valid Texture URLs</title>
     <style>
         body { margin: 0; overflow: hidden; background: #1a1a1a; }
         canvas { display: block; }
@@ -76,14 +76,14 @@
         const terrainTextureLoader = new THREE.TextureLoader();
         let terrainLoaded = false;
         terrainTextureLoader.load(
-            'https://cdn.polyhaven.org/asset_img/textures/grass_01/grass_01_diff_2k.jpg',
+            'https://ambientcg.com/get?file=Ground042_2K_Color.jpg',
             (texture) => {
                 texture.wrapS = THREE.RepeatWrapping;
                 texture.wrapT = THREE.RepeatWrapping;
                 texture.repeat.set(10, 10);
                 const displacementLoader = new THREE.TextureLoader();
                 displacementLoader.load(
-                    'https://cdn.polyhaven.org/asset_img/textures/grass_01/grass_01_disp_2k.png',
+                    'https://ambientcg.com/get?file=Ground042_2K_Displacement.jpg',
                     (displacementMap) => {
                         const terrainMaterial = new THREE.MeshStandardMaterial({
                             color: 0x8B4513,
@@ -138,10 +138,17 @@
         // Environment Map for Reflections
         log("Loading environment map...");
         const envMapLoader = new THREE.CubeTextureLoader();
-        envMapLoader.setPath('https://cdn.polyhaven.org/asset_img/textures/forest_01_1k/');
+        envMapLoader.setPath('https://dl.polyhaven.org/file/ph-assets/HDRIs/hdri/1k/');
         let envMapLoaded = false;
         envMapLoader.load(
-            ['forest_01_1k_px.jpg', 'forest_01_1k_nx.jpg', 'forest_01_1k_py.jpg', 'forest_01_1k_ny.jpg', 'forest_01_1k_pz.jpg', 'forest_01_1k_nz.jpg'],
+            [
+                'autumn_forest_02_1k_px.jpg',
+                'autumn_forest_02_1k_nx.jpg',
+                'autumn_forest_02_1k_py.jpg',
+                'autumn_forest_02_1k_ny.jpg',
+                'autumn_forest_02_1k_pz.jpg',
+                'autumn_forest_02_1k_nz.jpg'
+            ],
             (texture) => {
                 scene.background = texture;
                 scene.environment = texture;
