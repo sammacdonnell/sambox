@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Realistic Isometric Forest Scene with Three.js</title>
+    <title>Detailed Isometric Forest Scene with Three.js</title>
     <style>
         body { margin: 0; overflow: hidden; background: #1a1a1a; }
         canvas { display: block; }
@@ -16,145 +16,152 @@
     <script>
         // Scene setup
         const scene = new THREE.Scene();
-        scene.fog = new THREE.Fog(0x87CEEB, 5, 20); // Sky-blue fog for atmosphere
+        scene.fog = new THREE.Fog(0x87CEEB, 10, 30); // Fog for atmosphere
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.shadowMap.enabled = true; // Enable shadows
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Softer shadows
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         document.body.appendChild(renderer.domElement);
 
         // Lighting
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.2); // Soft base lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
         scene.add(ambientLight);
-        
-        const hemisphereLight = new THREE.HemisphereLight(0x87CEEB, 0x228B22, 0.6); // Sky and ground light
+        const hemisphereLight = new THREE.HemisphereLight(0x87CEEB, 0x228B22, 0.6);
         scene.add(hemisphereLight);
-        
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8); // Sun-like light
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
         directionalLight.position.set(5, 10, 5);
         directionalLight.castShadow = true;
-        directionalLight.shadow.camera.left = -10;
-        directionalLight.shadow.camera.right = 10;
-        directionalLight.shadow.camera.top = 10;
-        directionalLight.shadow.camera.bottom = -10;
-        directionalLight.shadow.camera.near = 0.5;
-        directionalLight.shadow.camera.far = 50;
-        directionalLight.shadow.mapSize.width = 1024; // Higher resolution shadows
-        directionalLight.shadow.mapSize.height = 1024;
+        directionalLight.shadow.camera.left = -15;
+        directionalLight.shadow.camera.right = 15;
+        directionalLight.shadow.camera.top = 15;
+        directionalLight.shadow.camera.bottom = -15;
+        directionalLight.shadow.mapSize.width = 2048;
+        directionalLight.shadow.mapSize.height = 2048;
         scene.add(directionalLight);
 
-        // Ground
-        const groundGeometry = new THREE.BoxGeometry(10, 0.5, 10);
-        const groundMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x8B4513, // Brown soil
-            roughness: 0.8, 
-            metalness: 0.1 
+        // Terrain with displacement map
+        const terrainSize = 20;
+        const terrainGeometry = new THREE.PlaneGeometry(terrainSize, terrainSize, 128, 128);
+        const terrainMaterial = new THREE.MeshStandardMaterial({
+            color: 0x8B4513,
+            roughness: 0.8,
+            metalness: 0.1,
+            displacementMap: new THREE.TextureLoader().load('https://threejs.org/examples/textures/terrain/displacement.jpg'),
+            displacementScale: 1.5,
+            map: new THREE.TextureLoader().load('https://threejs.org/examples/textures/terrain/grasslight-big.jpg')
         });
-        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-        ground.position.y = -0.25;
-        ground.receiveShadow = true;
-        scene.add(ground);
+        const terrain = new THREE.Mesh(terrainGeometry, terrainMaterial);
+        terrain.rotation.x = -Math.PI / 2;
+        terrain.receiveShadow = true;
+        scene.add(terrain);
 
-        // Pond
-        const pondGeometry = new THREE.CylinderGeometry(1.5, 1.5, 0.2, 32);
-        const pondMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x00CED1, // Turquoise water
-            roughness: 0.1, // Shiny surface
-            metalness: 0.0 
+        // Water (Pond) with ripple effect
+        const waterGeometry = new THREE.CircleGeometry(2, 32);
+        const waterMaterial = new THREE.MeshStandardMaterial({
+            color: 0x00CED1,
+            roughness: 0.1,
+            metalness: 0.0,
+            transparent: true,
+            opacity: 0.8
         });
-        const pond = new THREE.Mesh(pondGeometry, pondMaterial);
-        pond.position.set(0, -0.1, 0);
-        pond.receiveShadow = true;
-        scene.add(pond);
+        const water = new THREE.Mesh(waterGeometry, waterMaterial);
+        water.rotation.x = -Math.PI / 2;
+        water.position.set(0, 0.1, 0);
+        water.receiveShadow = true;
+        scene.add(water);
 
-        // Trees
-        const treePositions = [
-            [-3, 0, 3], [-2, 0, 2], [-1, 0, 3], [2, 0, 2], [3, 0, 1], [2, 0, -2], [-2, 0, -3]
-        ];
+        // Ripple animation for water
+        let time = 0;
+        function animateWater() {
+            time += 0.02;
+            waterMaterial.displacementMap = new THREE.TextureLoader().load('https://threejs.org/examples/textures/water.jpg');
+            waterMaterial.displacementScale = 0.1 * Math.sin(time);
+        }
 
-        treePositions.forEach(pos => {
+        // Trees with multiple cones for foliage
+        function createTree(x, z, scale = 1, color = 0x228B22) {
+            const treeGroup = new THREE.Group();
+
             // Trunk
-            const trunkGeometry = new THREE.CylinderGeometry(0.2, 0.2, 1, 8); // 8 segments for smoothness
-            const trunkMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0x4A2C2A, // Dark brown
-                roughness: 0.7, 
-                metalness: 0.0 
-            });
+            const trunkGeometry = new THREE.CylinderGeometry(0.2 * scale, 0.2 * scale, 1 * scale, 8);
+            const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x4A2C2A, roughness: 0.7, metalness: 0.0 });
             const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
-            trunk.position.set(pos[0], 0.5, pos[2]);
+            trunk.position.set(x, 0.5 * scale, z);
             trunk.castShadow = true;
+            treeGroup.add(trunk);
 
-            // Foliage
-            const foliageGeometry = new THREE.ConeGeometry(0.8, 2, 8); // 8 segments for smoother cone
-            const foliageMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0x228B22, // Forest green
-                roughness: 0.9, 
-                metalness: 0.0 
-            });
-            const foliage = new THREE.Mesh(foliageGeometry, foliageMaterial);
-            foliage.position.set(pos[0], 1.5, pos[2]);
-            foliage.castShadow = true;
+            // Foliage layers
+            const foliageGeometry1 = new THREE.ConeGeometry(0.8 * scale, 1.5 * scale, 8);
+            const foliageMaterial = new THREE.MeshStandardMaterial({ color, roughness: 0.9, metalness: 0.0 });
+            const foliage1 = new THREE.Mesh(foliageGeometry1, foliageMaterial);
+            foliage1.position.set(x, 1.5 * scale, z);
+            foliage1.castShadow = true;
+            treeGroup.add(foliage1);
 
-            // Randomize scale and rotation
-            const scale = 0.8 + Math.random() * 0.4; // Scale between 0.8 and 1.2
-            trunk.scale.set(scale, scale, scale);
-            foliage.scale.set(scale, scale, scale);
-            foliage.rotation.y = Math.random() * Math.PI * 2; // Random rotation
+            const foliageGeometry2 = new THREE.ConeGeometry(0.6 * scale, 1.2 * scale, 8);
+            const foliage2 = new THREE.Mesh(foliageGeometry2, foliageMaterial);
+            foliage2.position.set(x, 2.2 * scale, z);
+            foliage2.castShadow = true;
+            treeGroup.add(foliage2);
 
-            scene.add(trunk);
-            scene.add(foliage);
-        });
+            const foliageGeometry3 = new THREE.ConeGeometry(0.4 * scale, 0.8 * scale, 8);
+            const foliage3 = new THREE.Mesh(foliageGeometry3, foliageMaterial);
+            foliage3.position.set(x, 2.7 * scale, z);
+            foliage3.castShadow = true;
+            treeGroup.add(foliage3);
 
-        // One orange tree
-        const orangeFoliageGeometry = new THREE.ConeGeometry(0.8, 2, 8);
-        const orangeFoliageMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0xFF8C00, // Orange
-            roughness: 0.9, 
-            metalness: 0.0 
-        });
-        const orangeFoliage = new THREE.Mesh(orangeFoliageGeometry, orangeFoliageMaterial);
-        orangeFoliage.position.set(3, 1.5, 1);
-        orangeFoliage.castShadow = true;
-        scene.add(orangeFoliage);
+            // Random rotation
+            treeGroup.rotation.y = Math.random() * Math.PI * 2;
+            scene.add(treeGroup);
+        }
 
-        // Rocks
-        const rockPositions = [
-            [-2, 0, 1], [1, 0, -1], [3, 0, -3], [-3, 0, -1]
+        // Add trees with randomization
+        const treePositions = [
+            [-3, 3], [-2, 2], [-1, 3], [2, 2], [3, 1], [2, -2], [-2, -3], [1, 1], [-1, -1], [3, -1]
         ];
+        treePositions.forEach(pos => {
+            const scale = 0.8 + Math.random() * 0.4;
+            createTree(pos[0] + (Math.random() - 0.5), pos[1] + (Math.random() - 0.5), scale);
+        });
 
-        rockPositions.forEach(pos => {
+        // Add one orange tree
+        createTree(3, 1, 1, 0xFF8C00);
+
+        // Rocks with low-poly look
+        function createRock(x, z) {
             const rockGeometry = new THREE.DodecahedronGeometry(0.3);
-            const rockMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0xFFD700, // Gold-like
-                roughness: 0.5, 
-                metalness: 0.2 
-            });
+            const rockMaterial = new THREE.MeshStandardMaterial({ color: 0xFFD700, roughness: 0.5, metalness: 0.2 });
             const rock = new THREE.Mesh(rockGeometry, rockMaterial);
-            rock.position.set(pos[0], 0.3, pos[2]);
-            rock.castShadow = true;
-            // Randomize rotation and scale
+            rock.position.set(x, 0.3, z);
             rock.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
             rock.scale.set(0.5 + Math.random() * 0.5, 0.5 + Math.random() * 0.5, 0.5 + Math.random() * 0.5);
+            rock.castShadow = true;
             scene.add(rock);
-        });
+        }
+
+        const rockPositions = [
+            [-2, 1], [1, -1], [3, -3], [-3, -1], [0, 2], [2, 0]
+        ];
+        rockPositions.forEach(pos => createRock(pos[0], pos[1]));
 
         // Camera and OrbitControls
-        camera.position.set(8, 6, 8); // Initial isometric view
+        camera.position.set(8, 6, 8);
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true; // Smooth movement
+        controls.enableDamping = true;
         controls.dampingFactor = 0.05;
-        controls.minDistance = 5; // Prevent zooming too close
-        controls.maxDistance = 20; // Limit zoom out
-        controls.minPolarAngle = 0; // No below-ground view
-        controls.maxPolarAngle = Math.PI / 2; // Up to horizon
-        controls.target.set(0, 0, 0); // Orbit around scene center
+        controls.minDistance = 5;
+        controls.maxDistance = 20;
+        controls.minPolarAngle = 0;
+        controls.maxPolarAngle = Math.PI / 2;
+        controls.target.set(0, 0, 0);
         controls.update();
 
         // Animation loop
         function animate() {
             requestAnimationFrame(animate);
-            controls.update(); // Update controls each frame
+            animateWater(); // Update water ripples
+            controls.update();
             renderer.render(scene, camera);
         }
         animate();
