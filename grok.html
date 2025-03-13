@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Detailed Isometric Forest Scene with Three.js</title>
+    <title>Highly Accurate Isometric Forest Scene</title>
     <style>
         body { margin: 0; overflow: hidden; background: #1a1a1a; }
         canvas { display: block; }
@@ -16,7 +16,7 @@
     <script>
         // Scene setup
         const scene = new THREE.Scene();
-        scene.fog = new THREE.Fog(0x87CEEB, 10, 30); // Fog for atmosphere
+        scene.fog = new THREE.Fog(0x87CEEB, 10, 30); // Atmospheric fog
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -39,8 +39,11 @@
         directionalLight.shadow.mapSize.width = 2048;
         directionalLight.shadow.mapSize.height = 2048;
         scene.add(directionalLight);
+        const pointLight = new THREE.PointLight(0xffffff, 0.5, 10); // Light near pools
+        pointLight.position.set(0, 2, 0);
+        scene.add(pointLight);
 
-        // Terrain with displacement map
+        // Terrain
         const terrainSize = 20;
         const terrainGeometry = new THREE.PlaneGeometry(terrainSize, terrainSize, 128, 128);
         const terrainMaterial = new THREE.MeshStandardMaterial({
@@ -56,81 +59,114 @@
         terrain.receiveShadow = true;
         scene.add(terrain);
 
-        // Water (Pond) with ripple effect
-        const waterGeometry = new THREE.CircleGeometry(2, 32);
-        const waterMaterial = new THREE.MeshStandardMaterial({
+        // Environment Map for Reflections
+        new THREE.CubeTextureLoader()
+            .setPath('https://threejs.org/examples/textures/cube/pisa/')
+            .load(['px.jpg', 'nx.jpg', 'py.jpg', 'ny.jpg', 'pz.jpg', 'nz.jpg'], function (texture) {
+                scene.background = texture;
+                scene.environment = texture; // Used for reflections
+            });
+
+        // Larger Pool (Irregular Shape)
+        const largePoolShape = new THREE.Shape();
+        largePoolShape.moveTo(-1.5, 0);
+        largePoolShape.lineTo(-1, 1);
+        largePoolShape.lineTo(0, 1.5);
+        largePoolShape.lineTo(1, 1);
+        largePoolShape.lineTo(1.5, 0);
+        largePoolShape.lineTo(1, -1);
+        largePoolShape.lineTo(0, -1.5);
+        largePoolShape.lineTo(-1, -1);
+        largePoolShape.lineTo(-1.5, 0);
+        const largePoolExtrudeSettings = { depth: 0.2, bevelEnabled: false };
+        const largePoolGeometry = new THREE.ExtrudeGeometry(largePoolShape, largePoolExtrudeSettings);
+        const largePoolMaterial = new THREE.MeshPhysicalMaterial({
             color: 0x00CED1,
-            roughness: 0.1,
-            metalness: 0.0,
+            roughness: 0.2,
+            metalness: 0.1,
             transparent: true,
-            opacity: 0.8
+            opacity: 0.8,
+            envMap: scene.environment,
+            reflectivity: 0.8
         });
-        const water = new THREE.Mesh(waterGeometry, waterMaterial);
-        water.rotation.x = -Math.PI / 2;
-        water.position.set(0, 0.1, 0);
-        water.receiveShadow = true;
-        scene.add(water);
+        const largePool = new THREE.Mesh(largePoolGeometry, largePoolMaterial);
+        largePool.rotation.x = -Math.PI / 2;
+        largePool.position.set(0, 0.1, 0);
+        largePool.receiveShadow = true;
+        scene.add(largePool);
 
-        // Ripple animation for water
-        let time = 0;
-        function animateWater() {
-            time += 0.02;
-            waterMaterial.displacementMap = new THREE.TextureLoader().load('https://threejs.org/examples/textures/water.jpg');
-            waterMaterial.displacementScale = 0.1 * Math.sin(time);
+        // Smaller Pool (Circular with Perturbation)
+        const smallPoolGeometry = new THREE.CircleGeometry(0.8, 32);
+        const smallPoolVertices = smallPoolGeometry.vertices;
+        for (let i = 0; i < smallPoolVertices.length; i++) {
+            smallPoolVertices[i].x += (Math.random() - 0.5) * 0.2;
+            smallPoolVertices[i].z += (Math.random() - 0.5) * 0.2;
         }
+        smallPoolGeometry.vertices = smallPoolVertices;
+        smallPoolGeometry.computeVertexNormals();
+        const smallPoolMaterial = new THREE.MeshPhysicalMaterial({
+            color: 0x00CED1,
+            roughness: 0.2,
+            metalness: 0.1,
+            transparent: true,
+            opacity: 0.8,
+            envMap: scene.environment,
+            reflectivity: 0.8
+        });
+        const smallPool = new THREE.Mesh(smallPoolGeometry, smallPoolMaterial);
+        smallPool.rotation.x = -Math.PI / 2;
+        smallPool.position.set(-2, 0.1, 2);
+        smallPool.receiveShadow = true;
+        scene.add(smallPool);
 
-        // Trees with multiple cones for foliage
+        // Trees with Multi-Layered Foliage
         function createTree(x, z, scale = 1, color = 0x228B22) {
             const treeGroup = new THREE.Group();
-
-            // Trunk
-            const trunkGeometry = new THREE.CylinderGeometry(0.2 * scale, 0.2 * scale, 1 * scale, 8);
+            const trunkGeometry = new THREE.CylinderGeometry(0.2 * scale, 0.2 * scale, 1 * scale, 12);
             const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x4A2C2A, roughness: 0.7, metalness: 0.0 });
             const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
             trunk.position.set(x, 0.5 * scale, z);
             trunk.castShadow = true;
             treeGroup.add(trunk);
 
-            // Foliage layers
-            const foliageGeometry1 = new THREE.ConeGeometry(0.8 * scale, 1.5 * scale, 8);
+            const foliageGeometry1 = new THREE.ConeGeometry(0.8 * scale, 1.5 * scale, 12);
             const foliageMaterial = new THREE.MeshStandardMaterial({ color, roughness: 0.9, metalness: 0.0 });
             const foliage1 = new THREE.Mesh(foliageGeometry1, foliageMaterial);
             foliage1.position.set(x, 1.5 * scale, z);
             foliage1.castShadow = true;
             treeGroup.add(foliage1);
 
-            const foliageGeometry2 = new THREE.ConeGeometry(0.6 * scale, 1.2 * scale, 8);
+            const foliageGeometry2 = new THREE.ConeGeometry(0.6 * scale, 1.2 * scale, 12);
             const foliage2 = new THREE.Mesh(foliageGeometry2, foliageMaterial);
             foliage2.position.set(x, 2.2 * scale, z);
             foliage2.castShadow = true;
             treeGroup.add(foliage2);
 
-            const foliageGeometry3 = new THREE.ConeGeometry(0.4 * scale, 0.8 * scale, 8);
+            const foliageGeometry3 = new THREE.ConeGeometry(0.4 * scale, 0.8 * scale, 12);
             const foliage3 = new THREE.Mesh(foliageGeometry3, foliageMaterial);
             foliage3.position.set(x, 2.7 * scale, z);
             foliage3.castShadow = true;
             treeGroup.add(foliage3);
 
-            // Random rotation
             treeGroup.rotation.y = Math.random() * Math.PI * 2;
             scene.add(treeGroup);
         }
 
-        // Add trees with randomization
-        const treePositions = [
-            [-3, 3], [-2, 2], [-1, 3], [2, 2], [3, 1], [2, -2], [-2, -3], [1, 1], [-1, -1], [3, -1]
-        ];
-        treePositions.forEach(pos => {
-            const scale = 0.8 + Math.random() * 0.4;
-            createTree(pos[0] + (Math.random() - 0.5), pos[1] + (Math.random() - 0.5), scale);
-        });
+        // Tree positions based on image analysis
+        createTree(-2.5, 2.5, 0.9); // Upper-left tree
+        createTree(-1.5, 2, 1.0);  // Near small pool
+        createTree(0, 2.5, 0.95);   // Above large pool
+        createTree(2, 1.5, 1.1);    // Right of large pool
+        createTree(2.5, 0.5, 1.0);  // Orange tree
+        createTree(1, -1.5, 0.9);   // Lower-right
+        createTree(-1.5, -2, 1.0);  // Lower-left
 
-        // Add one orange tree
-        createTree(3, 1, 1, 0xFF8C00);
+        // Orange tree
+        createTree(2.5, 0.5, 1.0, 0xFF8C00);
 
-        // Rocks with low-poly look
-        function createRock(x, z) {
-            const rockGeometry = new THREE.DodecahedronGeometry(0.3);
+        // Rocks
+        function createRock(x, z, scale = 1) {
+            const rockGeometry = new THREE.DodecahedronGeometry(0.3 * scale);
             const rockMaterial = new THREE.MeshStandardMaterial({ color: 0xFFD700, roughness: 0.5, metalness: 0.2 });
             const rock = new THREE.Mesh(rockGeometry, rockMaterial);
             rock.position.set(x, 0.3, z);
@@ -140,10 +176,10 @@
             scene.add(rock);
         }
 
-        const rockPositions = [
-            [-2, 1], [1, -1], [3, -3], [-3, -1], [0, 2], [2, 0]
-        ];
-        rockPositions.forEach(pos => createRock(pos[0], pos[1]));
+        createRock(-1, 1, 1.0);    // Near small pool
+        createRock(1, -1, 0.8);    // Lower-right
+        createRock(2.5, -2, 1.2);  // Far-right
+        createRock(-2, -1, 0.9);   // Lower-left
 
         // Camera and OrbitControls
         camera.position.set(8, 6, 8);
@@ -160,7 +196,8 @@
         // Animation loop
         function animate() {
             requestAnimationFrame(animate);
-            animateWater(); // Update water ripples
+            largePool.material.needsUpdate = true; // Refresh reflection
+            smallPool.material.needsUpdate = true;
             controls.update();
             renderer.render(scene, camera);
         }
